@@ -41,7 +41,8 @@ And add `command-time` to `plugins` in `.zshrc`.
 
 You can override defaults in `.zshrc`:
 ```bash
-# Decimal places to show, 3 for milliseconds (default 0, whole seconds).
+# Decimal places to show (default 0, whole seconds). Any value above 0 also
+# shows durations under a second in ms, e.g. 18ms, then 2.5s with 1.
 # Timing uses $EPOCHREALTIME, so no need for `typeset -F SECONDS`.
 ZSH_COMMAND_TIME_PRECISION=3
 

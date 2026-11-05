@@ -23,14 +23,15 @@ _command_time_precmd() {
   [[ -n $_command_time_timer ]] || return
   # C locale keeps the decimal separator a dot
   local LC_NUMERIC=C
-  local -F elapsed=$(( EPOCHREALTIME - _command_time_timer ))
+  # read by zsh_command_time for the sub-second display
+  local -F _command_time_elapsed=$(( EPOCHREALTIME - _command_time_timer ))
   local -i precision=${ZSH_COMMAND_TIME_PRECISION:-0}
   unset _command_time_timer
-  if [[ -n $TTY ]] && (( elapsed >= ${ZSH_COMMAND_TIME_MIN_SECONDS:-3} )); then
+  if [[ -n $TTY ]] && (( _command_time_elapsed >= ${ZSH_COMMAND_TIME_MIN_SECONDS:-3} )); then
     if (( precision > 0 )); then
-      printf -v ZSH_COMMAND_TIME "%.${precision}f" $elapsed
+      printf -v ZSH_COMMAND_TIME "%.${precision}f" $_command_time_elapsed
     else
-      ZSH_COMMAND_TIME=${elapsed%%.*}
+      ZSH_COMMAND_TIME=${_command_time_elapsed%%.*}
     fi
     export ZSH_COMMAND_TIME
     if [ ! -z ${ZSH_COMMAND_TIME_MSG} ]; then
@@ -40,7 +41,7 @@ _command_time_precmd() {
 }
 
 zsh_command_time() {
-  local timer_show color sec_fmt
+  local timer_show color sec_fmt ms
   if [ -n "$ZSH_COMMAND_TIME" ]; then
     local LC_NUMERIC=C
     local -i precision=${ZSH_COMMAND_TIME_PRECISION:-0}
@@ -51,7 +52,13 @@ zsh_command_time() {
     # whole seconds of the last minute plus the fractional part
     printf -v sec_fmt "%.${precision}f" $(( total_sec % 60 + ZSH_COMMAND_TIME - total_sec ))
     color="$ZSH_COMMAND_TIME_COLOR"
-    if [[ "$total_sec" -lt 60 ]]; then # less than 1 minute
+    # under a second, show ms from the raw value so precision 1 still gives 18ms
+    if (( precision > 0 )) && [[ -n $_command_time_elapsed ]]; then
+      printf -v ms '%.0f' $(( _command_time_elapsed * 1000 ))
+    fi
+    if [[ -n "$ms" ]] && (( ms < 1000 )); then
+        timer_show="${ms}ms"
+    elif [[ "$total_sec" -lt 60 ]]; then # less than 1 minute
         timer_show="${sec_fmt}s"
     elif [[ "$total_sec" -lt 3600 ]]; then  # less than 1 hour
         timer_show="${min}m ${sec_fmt}s"
