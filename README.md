@@ -41,10 +41,12 @@ And add `command-time` to `plugins` in `.zshrc`.
 
 You can override defaults in `.zshrc`:
 ```bash
-# Use floating point numbers for time.
-typeset -F SECONDS
+# Decimal places to show, 3 for milliseconds (default 0, whole seconds).
+# Timing uses $EPOCHREALTIME, so no need for `typeset -F SECONDS`.
+ZSH_COMMAND_TIME_PRECISION=3
 
 # If command execution time above min. time, plugins will output time.
+# Fractions work too, e.g. 0.5.
 ZSH_COMMAND_TIME_MIN_SECONDS=3
 
 # Message to display (set to "%s" for disable).
@@ -71,7 +73,7 @@ zsh_command_time() {
         typeset -i hours=$(( ZSH_COMMAND_TIME / 3600))
         typeset -i min=$(( ZSH_COMMAND_TIME / 60 % 60))
         if [[ "$ZSH_COMMAND_TIME" == *.* ]]; then
-            # If SECONDS is a float, we limit the precision to 3 decimal places
+            # set when ZSH_COMMAND_TIME_PRECISION > 0, keep 3 decimal places
             typeset -F 3 sec
         fi
         # secunds are calculated as float or integer automatically

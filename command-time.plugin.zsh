@@ -1,3 +1,5 @@
+zmodload -F zsh/datetime p:EPOCHREALTIME
+
 _command_time_preexec() {
   # check excluded
   if [ -n "$ZSH_COMMAND_TIME_EXCLUDE" ]; then
@@ -10,7 +12,7 @@ _command_time_preexec() {
     done
   fi
 
-  _command_time_timer=${timer:-$SECONDS}
+  _command_time_timer=$EPOCHREALTIME
   ZSH_COMMAND_TIME_MSG=${ZSH_COMMAND_TIME_MSG-"Time: %s"}
   ZSH_COMMAND_TIME_COLOR=${ZSH_COMMAND_TIME_COLOR-"white"}
   ZSH_COMMAND_TIME_NO_COLOR=${ZSH_COMMAND_TIME_NO_COLOR-""}
@@ -18,34 +20,37 @@ _command_time_preexec() {
 }
 
 _command_time_precmd() {
-  local timer_show
-  if [ $_command_time_timer ]; then
-    timer_show=$(($SECONDS - $_command_time_timer))
-    if [ -n "$TTY" ] && [[ $timer_show -ge ${ZSH_COMMAND_TIME_MIN_SECONDS:-3} ]]; then
-      export ZSH_COMMAND_TIME="$timer_show"
-      if [ ! -z ${ZSH_COMMAND_TIME_MSG} ]; then
-        zsh_command_time
-      fi
+  [[ -n $_command_time_timer ]] || return
+  # C locale keeps the decimal separator a dot
+  local LC_NUMERIC=C
+  local -F elapsed=$(( EPOCHREALTIME - _command_time_timer ))
+  local -i precision=${ZSH_COMMAND_TIME_PRECISION:-0}
+  unset _command_time_timer
+  if [[ -n $TTY ]] && (( elapsed >= ${ZSH_COMMAND_TIME_MIN_SECONDS:-3} )); then
+    if (( precision > 0 )); then
+      printf -v ZSH_COMMAND_TIME "%.${precision}f" $elapsed
+    else
+      ZSH_COMMAND_TIME=${elapsed%%.*}
     fi
-    unset _command_time_timer
+    export ZSH_COMMAND_TIME
+    if [ ! -z ${ZSH_COMMAND_TIME_MSG} ]; then
+      zsh_command_time
+    fi
   fi
 }
 
 zsh_command_time() {
-  local days hours min sec sec_fmt timer_show color
+  local timer_show color sec_fmt
   if [ -n "$ZSH_COMMAND_TIME" ]; then
-    # Round to integers
-    typeset -i days=$(( ${ZSH_COMMAND_TIME} / 86400 ))
-    typeset -i hours=$(( ${ZSH_COMMAND_TIME} / 3600 % 24 ))
-    typeset -i min=$(( ${ZSH_COMMAND_TIME} / 60 % 60 ))
-    typeset -i total_sec=$(( ${ZSH_COMMAND_TIME} ))
-    sec=$(( ZSH_COMMAND_TIME % 60 ))
-    sec_fmt=$(printf '%d' "$sec")
+    local LC_NUMERIC=C
+    local -i precision=${ZSH_COMMAND_TIME_PRECISION:-0}
+    local -i total_sec=$(( ZSH_COMMAND_TIME ))
+    local -i days=$(( total_sec / 86400 ))
+    local -i hours=$(( total_sec / 3600 % 24 ))
+    local -i min=$(( total_sec / 60 % 60 ))
+    # whole seconds of the last minute plus the fractional part
+    printf -v sec_fmt "%.${precision}f" $(( total_sec % 60 + ZSH_COMMAND_TIME - total_sec ))
     color="$ZSH_COMMAND_TIME_COLOR"
-    if [[ "$ZSH_COMMAND_TIME" == *.* ]]; then
-      # If SECONDS is a float, we limit the precision to 2 decimal places
-      sec_fmt=$(printf '%02.2f' "$sec")
-    fi
     if [[ "$total_sec" -lt 60 ]]; then # less than 1 minute
         timer_show="${sec_fmt}s"
     elif [[ "$total_sec" -lt 3600 ]]; then  # less than 1 hour
